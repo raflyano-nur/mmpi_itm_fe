@@ -6,7 +6,14 @@ import { store } from './Store'
 import '@/Assets/Fonts/fonts.css'
 
 import ErrorBoundary from '@/Components/Errors/ErrorBoundary'
-import { LoginContainer, DashboardContainer, AdminMembersContainer } from './Containers'
+import {
+  LoginContainer,
+  DashboardContainer,
+  AdminMembersContainer,
+  AdminListContainer,
+  AdminDownloadContainer,
+  AdminMemberCreateContainer,
+} from './Containers'
 import { ProtectedRoute, PublicOnlyRoute, CatchAllRoute } from './Config/ProtectedRoute'
 
 const AppRoutes = () => {
@@ -36,10 +43,37 @@ const AppRoutes = () => {
       />
 
       <Route
+        path="/admin/list"
+        element={
+          <ProtectedRoute>
+            <AdminListContainer />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/members/create"
+        element={
+          <ProtectedRoute>
+            <AdminMemberCreateContainer />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/admin/members"
         element={
           <ProtectedRoute>
             <AdminMembersContainer />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/download"
+        element={
+          <ProtectedRoute>
+            <AdminDownloadContainer />
           </ProtectedRoute>
         }
       />

@@ -1,61 +1,79 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from "react";
 import {
-  useReactTable,
-  getCoreRowModel,
-  flexRender,
-  getPaginationRowModel,
-  getSortedRowModel,
-  getFilteredRowModel,
   ColumnDef,
   SortingState,
-} from '@tanstack/react-table'
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
 
 interface DataTableProps<T extends object> {
-  data?: T[]
-  columns?: ColumnDef<T, any>[]
-  pageSize?: number
-  showSearch?: boolean
-  searchPlaceholder?: string
-  isLoading?: boolean
-  emptyMessage?: string
-  // Server-side pagination props
-  totalData?: number
-  totalItems?: number // Alias for totalData for backward compatibility
-  currentPage?: number
-  lastPage?: number
-  apiFrom?: number // from API response
-  apiTo?: number // to API response
-  onPageChange?: (page: number) => void
-  onPageSizeChange?: (pageSize: number) => void
-  // Server-side sorting props
-  onSortChange?: (sortBy: string, sortOrder: string) => void
-  serverSortBy?: string
-  serverSortOrder?: string
-  // Server-side search props
-  onSearchChange?: (search: string) => void
-  onSearch?: (search: string) => void // Alias for backward compatibility
+  data?: T[];
+  columns?: ColumnDef<T, any>[];
+  pageSize?: number;
+  pageSizeOptions?: number[];
+  showSearch?: boolean;
+  searchPlaceholder?: string;
+  isLoading?: boolean;
+  isRefetching?: boolean;
+  emptyMessage?: string;
+  totalData?: number;
+  totalItems?: number;
+  currentPage?: number;
+  lastPage?: number;
+  apiFrom?: number;
+  apiTo?: number;
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
+  onSortChange?: (sortBy: string, sortOrder: string) => void;
+  serverSortBy?: string;
+  serverSortOrder?: string;
+  onSearchChange?: (search: string) => void;
+  onSearch?: (search: string) => void;
 }
 
-/**
- * Reusable DataTable Component untuk Redux Toolkit
- *
- * @param {Array} data - Data dari Redux store
- * @param {Array} columns - Column definitions
- * @param {number} pageSize - Items per page (default: 10)
- * @param {boolean} showSearch - Show search bar (default: true)
- * @param {string} searchPlaceholder - Search placeholder text
- * @param {boolean} isLoading - Loading state dari Redux
- * @param {string} emptyMessage - Message ketika data kosong
- */
+type DataTableColumnMeta = {
+  headerClassName?: string;
+  cellClassName?: string;
+  headerStyle?: React.CSSProperties;
+  cellStyle?: React.CSSProperties;
+};
+
+function getPageNumbers(
+  currentPage: number,
+  lastPage: number,
+): (number | "...")[] {
+  if (lastPage <= 7) {
+    return Array.from({ length: lastPage }, (_, i) => i + 1);
+  }
+
+  const pages: (number | "...")[] = [1];
+
+  if (currentPage > 3) pages.push("...");
+
+  const start = Math.max(2, currentPage - 1);
+  const end = Math.min(lastPage - 1, currentPage + 1);
+  for (let i = start; i <= end; i++) pages.push(i);
+
+  if (currentPage < lastPage - 2) pages.push("...");
+
+  pages.push(lastPage);
+  return pages;
+}
+
 export default function DataTable<T extends object>({
   data = [],
   columns = [],
   pageSize = 10,
+  pageSizeOptions = [5, 10, 20, 50, 100],
   showSearch = true,
-  searchPlaceholder = 'Cari...',
+  searchPlaceholder = "Cari...",
   isLoading = false,
-  emptyMessage = 'Tidak ada data',
-  // Server-side props
+  isRefetching = false,
+  emptyMessage = "Tidak ada data",
   totalData,
   totalItems,
   currentPage,
@@ -70,80 +88,131 @@ export default function DataTable<T extends object>({
   onSearchChange,
   onSearch,
 }: DataTableProps<T>) {
-  // Use totalItems if totalData is not provided (backward compatibility)
-  const total = totalData ?? totalItems
+  const normalizedPageSizeOptions = [
+    ...new Set([pageSize, ...pageSizeOptions]),
+  ].sort((a, b) => a - b);
+  const total = totalData ?? totalItems;
+  const handleSearch = onSearchChange ?? onSearch;
 
-  // Use onSearch if onSearchChange is not provided (backward compatibility)
-  const handleSearch = onSearchChange ?? onSearch
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [pendingPage, setPendingPage] = useState<number | null>(null);
+  const isServerSide = !!onPageChange;
 
-  const [sorting, setSorting] = useState<SortingState>([])
-  const [globalFilter, setGlobalFilter] = useState('')
-
-  // Server-side features can be enabled independently.
-  const isServerPagination = !!onPageChange
-  const isServerSorting = !!onSortChange
-  const isServerSearch = !!handleSearch
-
-  // Use API's from/to values directly for server-side pagination info
-  // If apiFrom/apiTo are not provided, fall back to calculation (for backward compatibility)
-  const paginationInfo = isServerPagination
+  const paginationInfo = isServerSide
     ? {
-        from: apiFrom ?? (total ? Math.max(1, ((currentPage || 1) - 1) * pageSize + 1) : 0),
-        to: apiTo ?? (total ? Math.min((currentPage || 1) * pageSize, total) : 0),
+        from:
+          apiFrom ??
+          (total ? Math.max(1, ((currentPage || 1) - 1) * pageSize + 1) : 0),
+        to:
+          apiTo ?? (total ? Math.min((currentPage || 1) * pageSize, total) : 0),
         total: total || 0,
       }
-    : null
+    : null;
 
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: isServerPagination ? undefined : getPaginationRowModel(),
-    getSortedRowModel: isServerSorting ? undefined : getSortedRowModel(),
-    getFilteredRowModel: isServerSearch ? undefined : getFilteredRowModel(),
+    getPaginationRowModel: isServerSide ? undefined : getPaginationRowModel(),
+    getSortedRowModel: onSortChange ? undefined : getSortedRowModel(),
+    getFilteredRowModel: isServerSide ? undefined : getFilteredRowModel(),
     state: {
-      sorting: isServerSorting ? [] : sorting,
-      globalFilter: isServerSearch ? '' : globalFilter,
-    },
-    onSortingChange: (updater) => {
-      if (isServerSorting && onSortChange) {
-        const newSort = typeof updater === 'function' ? updater(sorting) : updater
-        if (newSort.length > 0) {
-          const sortCol = (columns[newSort[0].id]?.accessorKey as string) || newSort[0].id
-          onSortChange(sortCol, newSort[0].desc ? 'desc' : 'asc')
-        } else {
-          onSortChange('', '')
-        }
-      } else {
-        setSorting(updater)
-      }
-    },
-    onGlobalFilterChange: (updater) => {
-      if (isServerSearch && handleSearch) {
-        const value = typeof updater === 'function' ? updater(globalFilter) : updater
-        handleSearch(value)
-      } else {
-        setGlobalFilter(updater)
-      }
-    },
-    manualPagination: isServerPagination,
-    manualSorting: isServerSorting,
-    pageCount: isServerPagination ? lastPage || 1 : -1,
-    initialState: {
+      sorting: onSortChange ? [] : sorting,
+      globalFilter: isServerSide ? "" : globalFilter,
       pagination: {
+        pageIndex: (currentPage || 1) - 1,
         pageSize,
       },
     },
-  })
+    onSortingChange: (updater) => {
+      if (onSortChange) {
+        const newSort =
+          typeof updater === "function" ? updater(sorting) : updater;
+        if (newSort.length > 0) {
+          const sortCol =
+            (columns[newSort[0].id]?.accessorKey as string) || newSort[0].id;
+          onSortChange(sortCol, newSort[0].desc ? "desc" : "asc");
+        } else {
+          onSortChange("", "");
+        }
+      } else {
+        setSorting(updater);
+      }
+    },
+    onGlobalFilterChange: (updater) => {
+      if (isServerSide && handleSearch) {
+        const value =
+          typeof updater === "function" ? updater(globalFilter) : updater;
+        handleSearch(value);
+      } else {
+        setGlobalFilter(updater);
+      }
+    },
+    manualPagination: isServerSide,
+    manualSorting: !!onSortChange,
+    pageCount: isServerSide ? lastPage || 1 : -1,
+  });
+
+  const getColumnMeta = (columnDef: ColumnDef<T, any>): DataTableColumnMeta =>
+    (columnDef.meta as DataTableColumnMeta) ?? {};
+
+  const resolvedCurrentPage = currentPage || 1;
+  const activePage = isServerSide
+    ? (pendingPage ?? resolvedCurrentPage)
+    : table.getState().pagination.pageIndex + 1;
+  const totalPages = isServerSide
+    ? lastPage || 1
+    : table.getPageCount() > 0
+      ? table.getPageCount()
+      : 1;
+  const isPageTransitioning =
+    isServerSide &&
+    pendingPage !== null &&
+    (pendingPage !== resolvedCurrentPage || isLoading || isRefetching);
+  const isPaginationBusy = isPageTransitioning || isLoading || isRefetching;
+  const canPrev = isServerSide ? activePage > 1 : table.getCanPreviousPage();
+  const canNext = isServerSide
+    ? activePage < (lastPage || 1)
+    : table.getCanNextPage() && table.getPageCount() > 1;
+
+  useEffect(() => {
+    if (!isServerSide) return;
+
+    if (
+      !isLoading &&
+      !isRefetching &&
+      pendingPage !== null &&
+      pendingPage === resolvedCurrentPage
+    ) {
+      setPendingPage(null);
+    }
+  }, [isLoading, isRefetching, isServerSide, pendingPage, resolvedCurrentPage]);
+
+  function goToPage(page: number) {
+    if (
+      page < 1 ||
+      page > totalPages ||
+      page === activePage ||
+      isPaginationBusy
+    )
+      return;
+
+    if (isServerSide && onPageChange) {
+      setPendingPage(page);
+      onPageChange(page - 1);
+    } else {
+      table.setPageIndex(page - 1);
+    }
+  }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
-      {/* Search Bar */}
+    <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-theme-sm">
       {showSearch && (
-        <div className="p-4 md:p-5 border-b border-neutral-100 bg-neutral-50/60">
+        <div className="border-b border-neutral-100 bg-neutral-50/60 p-4 md:p-5">
           <div className="relative">
             <svg
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4.5 h-4.5 text-neutral-400"
+              className="absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 transform text-neutral-400"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -158,22 +227,31 @@ export default function DataTable<T extends object>({
             <input
               type="text"
               placeholder={searchPlaceholder}
-              className="w-full pl-10 pr-4 py-2.5 text-sm border border-neutral-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all placeholder:text-neutral-400"
+              className="w-full rounded-lg border border-neutral-200 bg-white py-2.5 pl-10 pr-4 text-sm transition-all placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
               onChange={(e) => {
-                if (isServerSearch && handleSearch) {
-                  handleSearch(e.target.value)
+                if (isServerSide && handleSearch) {
+                  handleSearch(e.target.value);
                 } else {
-                  table.setGlobalFilter(e.target.value)
+                  table.setGlobalFilter(e.target.value);
                 }
               }}
-              // disabled={isLoading}
             />
           </div>
         </div>
       )}
 
-      {/* Table */}
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
+        {((isRefetching && !isLoading) || isPageTransitioning) &&
+        table.getRowModel().rows.length > 0 ? (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center bg-white/70 pt-6 backdrop-blur-[1px]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm text-neutral-600 shadow-sm">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-200 border-t-primary-500" />
+              {isPageTransitioning
+                ? "Memuat halaman..."
+                : "Memperbarui tabel..."}
+            </div>
+          </div>
+        ) : null}
         <table className="w-full">
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -181,20 +259,24 @@ export default function DataTable<T extends object>({
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="px-4 md:px-5 py-3 text-left text-xs font-semibold text-neutral-500 uppercase tracking-wider cursor-pointer hover:text-primary-600 transition-colors bg-neutral-50/40"
+                    className={`cursor-pointer bg-neutral-50/40 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-neutral-500 transition-colors hover:text-primary-600 md:px-5 ${getColumnMeta(header.column.columnDef).headerClassName ?? ""}`}
+                    style={getColumnMeta(header.column.columnDef).headerStyle}
                     onClick={header.column.getToggleSortingHandler()}
                   >
                     <div className="flex items-center gap-1.5">
-                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      {flexRender(
+                        header.column.columnDef.header,
+                        header.getContext(),
+                      )}
                       <span className="text-primary-500">
-                        {isServerSorting && serverSortBy === header.id
-                          ? serverSortOrder === 'desc'
-                            ? '↓'
-                            : '↑'
+                        {isServerSide && serverSortBy === header.id
+                          ? serverSortOrder === "desc"
+                            ? "↓"
+                            : "↑"
                           : ({
-                              asc: '↑',
-                              desc: '↓',
-                            }[header.column.getIsSorted() as string] ?? '')}
+                              asc: "↑",
+                              desc: "↓",
+                            }[header.column.getIsSorted() as string] ?? "")}
                       </span>
                     </div>
                   </th>
@@ -207,17 +289,29 @@ export default function DataTable<T extends object>({
               <tr>
                 <td colSpan={columns.length} className="px-5 py-16 text-center">
                   <div className="flex flex-col items-center justify-center">
-                    <div className="w-10 h-10 border-3 border-neutral-200 border-t-primary-500 rounded-full animate-spin"></div>
-                    <p className="mt-3 text-neutral-500 text-sm">Memuat data...</p>
+                    <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-neutral-200 border-t-primary-500" />
+                    <p className="mt-3 text-sm text-neutral-500">
+                      Memuat data...
+                    </p>
                   </div>
                 </td>
               </tr>
             ) : table.getRowModel().rows.length > 0 ? (
               table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="hover:bg-primary-50/30 transition-colors">
+                <tr
+                  key={row.id}
+                  className="transition-colors hover:bg-primary-50/30"
+                >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 md:px-5 py-3.5 text-sm text-neutral-700">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    <td
+                      key={cell.id}
+                      className={`px-4 py-3.5 text-sm text-neutral-700 md:px-5 ${getColumnMeta(cell.column.columnDef).cellClassName ?? ""}`}
+                      style={getColumnMeta(cell.column.columnDef).cellStyle}
+                    >
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -227,7 +321,7 @@ export default function DataTable<T extends object>({
                 <td colSpan={columns.length} className="px-5 py-16 text-center">
                   <div className="flex flex-col items-center justify-center">
                     <svg
-                      className="w-10 h-10 text-neutral-300 mb-3"
+                      className="mb-3 h-10 w-10 text-neutral-300"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -239,7 +333,7 @@ export default function DataTable<T extends object>({
                         d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
                       />
                     </svg>
-                    <p className="text-neutral-400 text-sm">{emptyMessage}</p>
+                    <p className="text-sm text-neutral-400">{emptyMessage}</p>
                   </div>
                 </td>
               </tr>
@@ -248,86 +342,125 @@ export default function DataTable<T extends object>({
         </table>
       </div>
 
-      {/* Pagination */}
       {!isLoading && table.getRowModel().rows.length > 0 && (
-        <div className="px-4 md:px-5 py-3.5 border-t border-neutral-100 bg-neutral-50/40">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-            {/* Info jumlah data - Server-side */}
-            {isServerPagination && total !== undefined && paginationInfo && (
+        <div className="border-t border-neutral-100 bg-neutral-50/40 px-4 py-3.5 md:px-5">
+          <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
+            {isServerSide && total !== undefined && paginationInfo && (
               <div className="text-sm text-neutral-500">
-                Menampilkan <span className="font-semibold text-neutral-800">{paginationInfo.from}</span> -{' '}
-                <span className="font-semibold text-neutral-800">{paginationInfo.to}</span> dari{' '}
-                <span className="font-semibold text-neutral-800">{paginationInfo.total}</span> data
+                Menampilkan{" "}
+                <span className="font-semibold text-neutral-800">
+                  {paginationInfo.from}
+                </span>{" "}
+                -{" "}
+                <span className="font-semibold text-neutral-800">
+                  {paginationInfo.to}
+                </span>{" "}
+                dari{" "}
+                <span className="font-semibold text-neutral-800">
+                  {paginationInfo.total}
+                </span>{" "}
+                data
               </div>
             )}
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  if (isServerPagination && onPageChange) {
-                    // TanStack Table uses 0-based indexing, convert from API's 1-based to 0-based
-                    onPageChange((currentPage || 1) - 1 - 1)
-                  } else {
-                    table.previousPage()
-                  }
-                }}
-                disabled={isServerPagination ? (currentPage || 1) <= 1 : !table.getCanPreviousPage()}
-                className="px-3.5 py-1.5 text-sm font-medium text-neutral-600 bg-white border border-neutral-200 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-neutral-50 hover:border-primary-300 hover:text-primary-600 transition-all cursor-pointer"
-              >
-                Sebelumnya
-              </button>
-              <button
-                onClick={() => {
-                  if (isServerPagination && onPageChange) {
-                    // TanStack Table uses 0-based indexing, convert from API's 1-based to 0-based
-                    onPageChange((currentPage || 1) - 1 + 1)
-                  } else {
-                    table.nextPage()
-                  }
-                }}
-                disabled={
-                  isServerPagination
-                    ? (currentPage || 1) >= (lastPage || 1)
-                    : !table.getCanNextPage() || table.getPageCount() <= 1
-                }
-                className="px-3.5 py-1.5 text-sm font-medium text-white bg-primary-500 border border-primary-500 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary-600 transition-all cursor-pointer"
-              >
-                Selanjutnya
-              </button>
+            <div className="flex items-center gap-1">
+              {totalPages > 1 ? (
+                <>
+                  <button
+                    onClick={() => goToPage(activePage - 1)}
+                    disabled={!canPrev || isPaginationBusy}
+                    className="cursor-pointer rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-600 transition-all hover:border-primary-300 hover:bg-neutral-50 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <span className="flex items-center gap-1">
+                      <svg
+                        className="h-3.5 w-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 19l-7-7 7-7"
+                        />
+                      </svg>
+                      Sebelumnya
+                    </span>
+                  </button>
+
+                  <div className="mx-1 flex items-center gap-1">
+                    {getPageNumbers(activePage, totalPages).map((page, idx) =>
+                      page === "..." ? (
+                        <span
+                          key={`ellipsis-${idx}`}
+                          className="flex h-8 w-8 select-none items-center justify-center text-sm text-neutral-400"
+                        >
+                          ...
+                        </span>
+                      ) : (
+                        <button
+                          key={page}
+                          onClick={() => goToPage(page as number)}
+                          disabled={isPaginationBusy}
+                          className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border text-sm font-medium transition-all ${
+                            page === activePage
+                              ? "border-primary-500 bg-primary-500 text-white"
+                              : "border-neutral-200 bg-white text-neutral-600 hover:border-primary-300 hover:bg-neutral-50 hover:text-primary-600"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ),
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => goToPage(activePage + 1)}
+                    disabled={!canNext || isPaginationBusy}
+                    className="cursor-pointer rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-600 transition-all hover:border-primary-300 hover:bg-neutral-50 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <span className="flex items-center gap-1">
+                      Selanjutnya
+                      <svg
+                        className="h-3.5 w-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    </span>
+                  </button>
+                </>
+              ) : (
+                <div className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-sm text-neutral-500">
+                  1 halaman
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-4">
-              {isServerPagination ? (
-                <span className="text-sm text-neutral-500">
-                  Halaman <span className="font-semibold text-primary-600">{currentPage || 1}</span> dari{' '}
-                  <span className="font-semibold text-neutral-800">{lastPage || 1}</span>
-                </span>
-              ) : (
-                <span className="text-sm text-neutral-500">
-                  Halaman
-                  <span className="font-semibold text-primary-600">
-                    {table.getState().pagination.pageIndex + 1}
-                  </span>
-                  dari{' '}
-                  <span className="font-semibold text-neutral-800">
-                    {table.getPageCount() > 0 ? table.getPageCount() : 1}
-                  </span>
-                </span>
-              )}
-
               <select
-                value={isServerPagination ? pageSize : table.getState().pagination.pageSize}
+                value={
+                  isServerSide ? pageSize : table.getState().pagination.pageSize
+                }
                 onChange={(e) => {
-                  const newSize = Number(e.target.value)
-                  if (isServerPagination && onPageSizeChange) {
-                    onPageSizeChange(newSize)
+                  const newSize = Number(e.target.value);
+                  if (isServerSide && onPageSizeChange) {
+                    onPageSizeChange(newSize);
                   } else {
-                    table.setPageSize(newSize)
+                    table.setPageSize(newSize);
                   }
                 }}
-                className="px-2.5 py-1.5 text-sm border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 bg-white text-neutral-600 cursor-pointer"
+                className="cursor-pointer rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm text-neutral-600 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
               >
-                {[5, 10, 20, 50].map((size) => (
+                {normalizedPageSizeOptions.map((size) => (
                   <option key={size} value={size}>
                     {size} per halaman
                   </option>
@@ -338,5 +471,5 @@ export default function DataTable<T extends object>({
         </div>
       )}
     </div>
-  )
+  );
 }

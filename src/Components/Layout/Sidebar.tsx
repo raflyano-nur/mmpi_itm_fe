@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useCallback } from 'react'
 import { FiMenu, FiX } from 'react-icons/fi'
 import { HiUserGroup } from 'react-icons/hi2'
 import { RiLogoutCircleLine } from 'react-icons/ri'
@@ -7,6 +7,7 @@ import { useSelector, useDispatch } from 'react-redux'
 import { setRoute } from '@/Store/redux/Sidebar'
 import { useLogoutMutation, useMeQuery, useGetMenuQuery } from '@/Services/Modules/auth'
 import Icon from '@/Components/General/Icon'
+import { api } from '@/Services/api'
 
 interface SidebarProps {
   isCollapsed: boolean
@@ -19,11 +20,24 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle, isMobile = fal
   const navigate = useNavigate()
   const dispatch = useDispatch()
 
-  const { data: meData } = useMeQuery()
+  // Polling setiap 30 detik untuk data user
+  const { data: meData } = useMeQuery(undefined, {
+    pollingInterval: 30000, // Polling setiap 30 detik
+    refetchOnMountOrArgChange: true, // Refetch saat komponen mount
+    refetchOnReconnect: true, // Refetch saat koneksi kembali
+    refetchOnFocus: true, // Refetch saat window focus
+  })
+
+  // Polling setiap 1 menit untuk menu
+  const { data: menuData } = useGetMenuQuery(undefined, {
+    pollingInterval: 60000, // Polling setiap 1 menit
+    refetchOnMountOrArgChange: true,
+  })
+
   const user = meData?.data?.user
   const isAdmin = user?.role === 'admin'
+  const isActive = user?.is_active === 1 // 1 = aktif, 0 = nonaktif
 
-  const { data: menuData } = useGetMenuQuery()
   const menuItems = menuData?.data?.menu ?? []
 
   const SidebarRoute = useSelector((state: any) => state?.SidebarSlicer?.Route)
@@ -36,15 +50,29 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle, isMobile = fal
     if (isMobile) onMobileClose?.()
   }
 
-  const handleLogout = async () => {
+  // Fungsi logout yang aman dari infinite loop
+  const handleLogout = useCallback(async () => {
     try {
       await logout().unwrap()
     } catch (error) {
       console.error('Logout error:', error)
     } finally {
-      navigate('/login')
+      // Reset semua cache RTK Query
+      dispatch(api.util.resetApiState())
+      // Hapus token dari localStorage jika ada
+      localStorage.removeItem('token')
+      // Navigasi ke login
+      navigate('/login', { replace: true })
     }
-  }
+  }, [logout, dispatch, navigate])
+
+  // Cek status is_active user
+  useEffect(() => {
+    if (user && user.is_active === 0) {
+      console.warn('User is inactive, logging out...')
+      handleLogout()
+    }
+  }, [user?.is_active, handleLogout])
 
   return (
     <div
@@ -90,7 +118,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle, isMobile = fal
         {(!isCollapsed || isMobile) && (
           <div className="mb-6">
             <div className="flex items-center justify-between px-3 py-2 text-base font-semibold text-primary-600">
-              {/* <span>{isAdmin ? 'Menu Admin' : 'Menu'}</span> */}
               <span>Menu</span>
             </div>
             <div className="space-y-1">
@@ -107,14 +134,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle, isMobile = fal
                       <Icon iconName={item.icon} className="w-4 h-4 text-white" />
                     </div>
                   </div>
-                  <span className={`truncate text-sm text-left ${item.route === SidebarRoute ? 'font-medium' : ''}`}>
+                  <span
+                    className={`truncate text-sm text-left ${item.route === SidebarRoute ? 'font-medium' : ''}`}
+                  >
                     {item.label}
                   </span>
                 </button>
               ))}
 
               {/* PROFILE */}
-              <button
+              {/* <button
                 onClick={() => goTo('/profile')}
                 className={`w-full px-3 py-2.5 rounded-lg hover:bg-primary-100 hover:text-primary-600 transition-colors flex items-center gap-3 cursor-pointer ${
                   '/profile' === SidebarRoute ? 'bg-gradient-to-r from-yellow-400/10 to-primary-500/10' : ''
@@ -128,7 +157,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle, isMobile = fal
                 <span className={`truncate text-sm ${'/profile' === SidebarRoute ? 'font-medium' : ''}`}>
                   Profile
                 </span>
-              </button>
+              </button> */}
             </div>
           </div>
         )}
@@ -165,8 +194,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle, isMobile = fal
       {/* Bottom Section */}
       <div className="app-shell__footer shrink-0 border-t border-gray-300">
         {(!isCollapsed || isMobile) && user && (
-          <div className="px-3 py-2 text-xs text-gray-500 truncate">
-            {user.username} · <span className="capitalize">{user.role}</span>
+          <div className="px-3 py-2 text-xs text-gray-500 truncate flex items-center gap-2">
+            <span>{user.username}</span>
+            <span>·</span>
+            <span className="capitalize">{user.role}</span>
+            {/* Indikator status aktif/nonaktif */}
+            <span
+              className={`inline-block w-2 h-2 rounded-full ${isActive ? 'bg-green-500' : 'bg-red-500'}`}
+              title={isActive ? 'Akun Aktif' : 'Akun Nonaktif'}
+            />
           </div>
         )}
         <button

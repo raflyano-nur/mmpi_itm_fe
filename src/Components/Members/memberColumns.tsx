@@ -1,21 +1,21 @@
-import { ColumnDef } from '@tanstack/react-table'
-import type { Member } from '@/Services/Modules/members/getMembers'
-import MemberStatusBadge from './MemberStatusBadge'
-import MemberRowActions from './MemberRowActions'
+import { ColumnDef } from "@tanstack/react-table";
+import type { Member } from "@/Services/Modules/members/getMembers";
+import MemberStatusBadge from "./MemberStatusBadge";
+import MemberRowActions from "./MemberRowActions";
 
 interface BuildMemberColumnsArgs {
-  selectedIds: (string | number)[]
-  onToggleSelect: (id: string | number) => void
-  onToggleSelectAll: () => void
-  isAllSelected: boolean
-  onToggleVerify: (member: Member) => void
-  onDelete: (member: Member) => void
-  togglingId?: string | number | null
-  deletingId?: string | number | null
+  selectedIds: (string | number)[];
+  onToggleSelect: (id: string | number) => void;
+  onToggleSelectAll: () => void;
+  isAllSelected: boolean;
+  onToggleVerify: (member: Member) => void;
+  onDelete: (member: Member) => void;
+  togglingId?: string | number | null;
+  deletingId?: string | number | null;
 }
 
 const checkboxClass =
-  'w-4 h-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500 cursor-pointer'
+  "w-4 h-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500 cursor-pointer";
 
 export function buildMemberColumns({
   selectedIds,
@@ -29,7 +29,7 @@ export function buildMemberColumns({
 }: BuildMemberColumnsArgs): ColumnDef<Member, any>[] {
   return [
     {
-      id: 'select',
+      id: "select",
       header: () => (
         <input
           type="checkbox"
@@ -51,9 +51,9 @@ export function buildMemberColumns({
       ),
       enableSorting: false,
     },
-        {
-      id: 'actions',
-      header: 'Aksi',
+    {
+      id: "actions",
+      header: "Aksi",
       cell: ({ row }) => (
         <MemberRowActions
           member={row.original}
@@ -66,35 +66,36 @@ export function buildMemberColumns({
       enableSorting: false,
     },
     {
-      id: 'IDNumber',
-      header: 'ID Number',
+      id: "IDNumber",
+      header: "ID Number",
       accessorFn: (row) => row.IDNumber,
     },
     {
-      id: 'Name',
-      header: 'Nama',
+      id: "Name",
+      header: "Nama",
       accessorFn: (row) => row.Name,
-      cell: ({ row }) => <span className="font-medium text-neutral-800">{row.original.Name}</span>,
+      cell: ({ row }) => (
+        <span className="font-medium text-neutral-800">
+          {row.original.Name}
+        </span>
+      ),
     },
     {
-      id: 'username',
-      header: 'Username',
-      accessorFn: (row) => row.username,
+      id: "BirthDate",
+      header: "Tanggal Lahir",
+      accessorFn: (row) => row.BirthDate,
     },
     {
-      id: 'Gender',
-      header: 'Jenis Kelamin',
+      id: "Gender",
+      header: "Jenis Kelamin",
       accessorFn: (row) => row.Gender,
     },
     {
-      id: 'tgl_register',
-      header: 'Tgl Daftar',
-      accessorFn: (row) => row.tgl_register,
+      id: "status",
+      header: "Status",
+      cell: ({ row }) => (
+        <MemberStatusBadge isActive={row.original.is_active} />
+      ),
     },
-    {
-      id: 'status',
-      header: 'Status',
-      cell: ({ row }) => <MemberStatusBadge isActive={row.original.is_active} />,
-    },
-  ]
+  ];
 }
