@@ -5,12 +5,14 @@ export interface Member {
   Name: string
   Address?: string
   Gender?: string
-  Birthdate?: string
+  BirthDate?: string
   Age?: string | number
   Education?: string
   MaritalStatus?: string
   Occupation?: string
   ReferredBy?: string
+  NIM?: string
+  ProgramStudi?: string
   username: string
   role: 'user' | 'admin'
   tgl_register?: string
