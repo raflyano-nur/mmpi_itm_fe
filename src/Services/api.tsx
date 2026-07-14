@@ -66,6 +66,7 @@ export const api = createApi({
     "Chart",
     "Dashboard",
     "Answers",
+    "Test",
   ],
   endpoints: () => ({}),
 });

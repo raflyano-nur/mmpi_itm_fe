@@ -13,6 +13,9 @@ import {
   AdminListContainer,
   AdminDownloadContainer,
   AdminMemberCreateContainer,
+  ProfileContainer,
+  InfoMmpiContainer,
+  TestContainer,
 } from './Containers'
 import { ProtectedRoute, PublicOnlyRoute, CatchAllRoute } from './Config/ProtectedRoute'
 
@@ -70,10 +73,55 @@ const AppRoutes = () => {
       />
 
       <Route
+        path="/Profile"
+        element={
+          <ProtectedRoute>
+            <ProfileContainer />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/admin/download"
         element={
           <ProtectedRoute>
             <AdminDownloadContainer />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/info/mmpi"
+        element={
+          <ProtectedRoute>
+            <InfoMmpiContainer />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/test"
+        element={
+          <ProtectedRoute>
+            <TestContainer />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/test/:userId"
+        element={
+          <ProtectedRoute>
+            <TestContainer />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/test/:userId/:page"
+        element={
+          <ProtectedRoute>
+            <TestContainer />
           </ProtectedRoute>
         }
       />
