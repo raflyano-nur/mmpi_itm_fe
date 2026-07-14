@@ -4,6 +4,7 @@ import AppLayout from '@/Components/Layout/AppLayout'
 import { UserDashboardView, AdminDashboardView } from '@/Components'
 import { useMeQuery } from '@/Services/Modules/auth'
 import { useGetDashboardSummaryQuery } from '@/Services/Modules/dashboard'
+import { useSaveTestSettingsMutation } from '@/Services/Modules/test'
 import { HiUserGroup, HiCheckCircle, HiClock, HiClipboardDocumentList } from 'react-icons/hi2'
 
 const DashboardContainer = () => {
@@ -16,11 +17,15 @@ const DashboardContainer = () => {
   const [testPurpose, setTestPurpose] = useState('')
   const [agreed, setAgreed] = useState(false)
   const [isSubmittingTest, setIsSubmittingTest] = useState(false)
+  const [saveTestSettings] = useSaveTestSettingsMutation()
 
   const handleStartTest = async () => {
     setIsSubmittingTest(true)
     try {
-      console.log('Starting test with purpose:', testPurpose)
+      await saveTestSettings({
+        TestSetting: testPurpose.trim(),
+        ScoreInitial: String(user?.IDNumber ?? ''),
+      }).unwrap()
       navigate(`/test/${user?.IDNumber}/1`)
     } finally {
       setIsSubmittingTest(false)
@@ -86,7 +91,7 @@ const DashboardContainer = () => {
           onAgreedChange={setAgreed}
           onSubmit={handleStartTest}
           onNavigateProfile={() => navigate('/profile')}
-          onNavigateTestInfo={() => navigate('/test/info')}
+          onNavigateTestInfo={() => navigate('/info/mmpi')}
         />
       )}
     </AppLayout>

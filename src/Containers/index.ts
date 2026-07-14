@@ -4,3 +4,6 @@ export { default as AdminMembersContainer } from '@/Containers/Members/AdminMemb
 export { default as AdminListContainer } from '@/Containers/AdminList/AdminListContainer'
 export { default as AdminDownloadContainer } from '@/Containers/Download/AdminDownloadContainer'
 export { default as AdminMemberCreateContainer } from '@/Containers/Members/AdminMemberCreateContainer'
+export { default as ProfileContainer } from '@/Containers/Profile/ProfileContainer'
+export { default as InfoMmpiContainer } from '@/Containers/InfoMmpi/InfoMmpiContainer'
+export { default as TestContainer } from '@/Containers/Test/TestContainer'

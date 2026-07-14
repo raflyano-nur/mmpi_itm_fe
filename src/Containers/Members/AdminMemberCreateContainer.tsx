@@ -7,6 +7,7 @@ import Icon from '@/Components/General/Icon'
 import { useNotification } from '@/Components/General/Notification'
 import { useCreateMemberMutation } from '@/Services/Modules/members'
 import type { CreateMemberCredentials } from '@/Services/Modules/members'
+import { calculateAgeFromBirthdate, toPasswordFromBirthdate } from '@/Helpers/memberDate'
 import { joinClassNames } from '@/Utils/laboratorium'
 
 interface MemberCreateFormData {
@@ -79,6 +80,7 @@ const fields: FieldConfig[] = [
     key: 'age',
     label: 'Usia',
     type: 'number',
+    required: true,
     readOnly: true,
     placeholder: 'Otomatis dari BirthDate',
     helperText: 'Dihitung otomatis dari BirthDate.',
@@ -113,19 +115,6 @@ const fields: FieldConfig[] = [
     helperText: 'Aktifkan jika peserta langsung boleh login dan mengikuti test.',
   },
 ]
-
-const calculateAgeFromBirthdate = (isoDate: string): string => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return ''
-  const birth = new Date(isoDate)
-  if (Number.isNaN(birth.getTime())) return ''
-
-  const today = new Date()
-  let age = today.getFullYear() - birth.getFullYear()
-  const monthDiff = today.getMonth() - birth.getMonth()
-  const dayDiff = today.getDate() - birth.getDate()
-  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) age -= 1
-  return age >= 0 ? String(age) : ''
-}
 
 const inputClass = (hasError: boolean, readOnly?: boolean) =>
   joinClassNames(
@@ -441,7 +430,11 @@ export default function AdminMemberCreateContainer() {
                     <p className="text-sm font-semibold text-emerald-800">Otomatis oleh sistem</p>
                     <p className="mt-1 text-sm leading-6 text-emerald-700">
                       ID Number dibuat mengikuti pola tanggal registrasi, sedangkan Username dan Password
-                      mengikuti ID Number & Tanggal Lahir peserta. Kredensial akan ditampilkan setelah data
+                      mengikuti ID Number & Tanggal Lahir peserta. Password preview:{' '}
+                      <span className="font-mono font-semibold">
+                        {toPasswordFromBirthdate(formData.birthdate) || 'isi tanggal lahir dulu'}
+                      </span>
+                      . Kredensial akan ditampilkan setelah data
                       berhasil disimpan.
                     </p>
                   </div>

@@ -5,6 +5,7 @@ import {
   useUpdateMemberMutation,
 } from "@/Services/Modules/members";
 import type { Member } from "@/Services/Modules/members/getMembers";
+import { calculateAgeFromBirthdate, toInputDate } from "@/Helpers/memberDate";
 
 // Import MultiSelect component
 import MultiSelect from "@/Components/General/MultiSelect";
@@ -34,38 +35,6 @@ const MARITAL_STATUS_OPTIONS = [
   { value: "Menikah", label: "Menikah" },
   { value: "Cerai", label: "Cerai" },
 ];
-
-// Backend menyimpan tanggal sebagai teks DD/MM/YYYY, sedangkan <input type="date">
-// butuh format ISO YYYY-MM-DD. Backend sendiri sudah toleran menerima kedua format
-// saat submit (lihat helper `to_db_date` di api.py), jadi konversi cukup dilakukan
-// satu arah di sini untuk keperluan menampilkan nilai awal form.
-const toInputDate = (value?: string | number | null): string => {
-  if (!value) return "";
-  const text = String(value).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
-  const match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!match) return "";
-  const [, d, m, y] = match;
-  return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
-};
-
-// Hitung usia (tahun penuh) dari tanggal lahir format ISO YYYY-MM-DD.
-// Mengembalikan string kosong kalau tanggal tidak valid, supaya tidak
-// menimpa field usia dengan nilai yang salah.
-const calculateAgeFromBirthdate = (isoDate: string): string => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return "";
-  const birth = new Date(isoDate);
-  if (Number.isNaN(birth.getTime())) return "";
-
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-  const dayDiff = today.getDate() - birth.getDate();
-  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
-    age -= 1;
-  }
-  return age >= 0 ? String(age) : "";
-};
 
 // Bangun nilai form dari sebuah objek Member (dipakai baik untuk data baris
 // tabel yang sudah ada, maupun data lengkap hasil useGetMemberDetailQuery).
@@ -115,6 +84,7 @@ const fields: FormFieldConfig<MemberEditFormData>[] = [
     key: "birthdate",
     label: "Tanggal Lahir",
     type: "custom",
+    required: true,
     render: ({ value, errors, setValues }) => (
       <input
         type="date"
@@ -136,6 +106,7 @@ const fields: FormFieldConfig<MemberEditFormData>[] = [
     key: "age",
     label: "Usia",
     type: "number",
+    required: true,
     placeholder: "Usia (tahun)",
     helperText:
       "Otomatis terisi dari tanggal lahir, bisa diubah manual bila perlu.",

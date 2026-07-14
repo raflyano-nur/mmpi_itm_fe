@@ -1,5 +1,5 @@
 import { EndpointBuilder } from "@reduxjs/toolkit/dist/query/endpointDefinitions";
-import type { Member } from "../Members/getMembers";
+import type { Member } from "../members/getMembers";
 
 export interface AnswerTestInfo {
   test_setting: string | null;
@@ -8,8 +8,8 @@ export interface AnswerTestInfo {
   waktu_selesai: string | null;
 }
 
-// key = nomor soal ("1".."567"), value = 0 | 1 | null (belum dijawab)
-export type AnswerMap = Record<string, 0 | 1 | null>;
+// key = nomor soal ("1".."567"), value = 1 (YA), 2 (TIDAK), 0/null (belum dijawab)
+export type AnswerMap = Record<string, 0 | 1 | 2 | null>;
 
 export interface GetAnswersResponseData {
   member: Member;
