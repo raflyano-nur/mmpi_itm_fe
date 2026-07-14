@@ -143,7 +143,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle, isMobile = fal
               ))}
 
               {/* PROFILE */}
-              {/* <button
+              <button
                 onClick={() => goTo('/profile')}
                 className={`w-full px-3 py-2.5 rounded-lg hover:bg-primary-100 hover:text-primary-600 transition-colors flex items-center gap-3 cursor-pointer ${
                   '/profile' === SidebarRoute ? 'bg-gradient-to-r from-yellow-400/10 to-primary-500/10' : ''
@@ -157,7 +157,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle, isMobile = fal
                 <span className={`truncate text-sm ${'/profile' === SidebarRoute ? 'font-medium' : ''}`}>
                   Profile
                 </span>
-              </button> */}
+              </button>
             </div>
           </div>
         )}
